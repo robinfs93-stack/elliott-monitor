@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Elliott-Wellen-Monitor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+/* Layout: Kopfzeile mit Stand, Übersicht als gruppierte Zeilenliste, Detail mit Chart + Szenario-Spalten */
+:root{
+  --bg:#f3f4f6; --panel:#ffffff; --ink:#18202b; --muted:#5b6574; --line:#dde1e7; --soft:#eef0f3;
+  --gold:#a8761c; --gold-soft:#f4ead6; --up:#1c7a4f; --down:#b3362f; --warn:#a8761c; --up-soft:#e2f2ea; --down-soft:#f7e4e2;
+  --f-body:"IBM Plex Sans",system-ui,sans-serif; --f-head:"IBM Plex Sans Condensed","IBM Plex Sans",system-ui,sans-serif;
+  --f-num:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#10151c; --panel:#171e27; --ink:#e4e8ee; --muted:#93a0b1; --line:#2a3440; --soft:#1e2731;
+  --gold:#d9a644; --gold-soft:#3a2f1a; --up:#4cc38a; --down:#ef6b61; --warn:#d9a644; --up-soft:#16342a; --down-soft:#3d1f1d; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#10151c; --panel:#171e27; --ink:#e4e8ee; --muted:#93a0b1; --line:#2a3440; --soft:#1e2731;
+  --gold:#d9a644; --gold-soft:#3a2f1a; --up:#4cc38a; --down:#ef6b61; --warn:#d9a644; --up-soft:#16342a; --down-soft:#3d1f1d; color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--f-body);
+  padding:env(safe-area-inset-top,0) max(16px,env(safe-area-inset-right,0px)) env(safe-area-inset-bottom,0) max(16px,env(safe-area-inset-left,0px))}
+.wrap{max-width:1180px;margin:0 auto;padding-block:20px 48px}
+.num{font-family:var(--f-num);font-variant-numeric:tabular-nums}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px;margin-bottom:18px}
+h1{font:600 26px/1.15 var(--f-head);margin:0;letter-spacing:-.01em}
+h1 .phi{color:var(--gold)}
+.stamp{color:var(--muted);font-size:13px}
+.stamp.old{color:var(--down)}
+nav{display:flex;gap:4px;background:var(--soft);padding:3px;border-radius:8px}
+nav a{padding:6px 14px;border-radius:6px;color:var(--muted);text-decoration:none;font-weight:500;font-size:14px}
+nav a.on{background:var(--panel);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+a:focus-visible,button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+h2{font:600 13px/1 var(--f-head);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:26px 0 8px}
+.list{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.row{display:grid;grid-template-columns:minmax(120px,1.1fr) 120px 1.5fr 1.15fr 1.15fr 70px;gap:14px;align-items:center;
+  padding:12px 16px;border-top:1px solid var(--line);color:inherit;text-decoration:none}
+.row:first-child{border-top:0}
+.row:hover{background:var(--soft)}
+.row.head{font-size:12px;color:var(--muted);padding-block:8px;background:var(--soft)}
+.row.head:hover{background:var(--soft)}
+.name b{display:block;font-weight:600}
+.name span{font-size:12px;color:var(--muted)}
+.px{text-align:right}
+.px .chg{font-size:12px}
+.up{color:var(--up)} .down{color:var(--down)}
+.wave{display:flex;align-items:center;gap:8px;min-width:0}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:999px;font-size:13px;font-weight:600;white-space:nowrap}
+.chip.bull{background:var(--up-soft);color:var(--up)} .chip.bear{background:var(--down-soft);color:var(--down)}
+.wave small{color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lvl{font-size:13px;min-width:0}
+.lvl .k{display:block;font-size:11px;color:var(--muted)}
+.fitcell{display:flex;flex-direction:column;gap:4px;align-items:flex-end;font-size:12px}
+.bar{width:56px;height:5px;border-radius:3px;background:var(--soft);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--gold)}
+.spark{display:block}
+.stale{display:inline-block;margin-left:6px;font-size:11px;color:var(--down);font-weight:600}
+@media (max-width:820px){
+  .row.head{display:none}
+  .row{grid-template-columns:1fr auto;gap:8px 12px}
+  .wave{grid-column:1/-1}
+  .lvl{grid-column:span 1}
+  .fitcell{display:none}
+}
+/* Detail */
+.back{display:inline-block;margin-bottom:12px;color:var(--muted);text-decoration:none;font-size:14px}
+.dhead{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 18px;margin-bottom:12px}
+.dhead h1{font-size:30px}
+.dhead .big{font:500 24px var(--f-num)}
+.toggle{display:inline-flex;background:var(--soft);padding:3px;border-radius:8px;gap:3px;margin-bottom:10px}
+.toggle button{border:0;background:transparent;color:var(--muted);font:500 14px var(--f-body);padding:6px 12px;border-radius:6px;cursor:pointer}
+.toggle button.on{background:var(--panel);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.toggle button:disabled{opacity:.4;cursor:default}
+#chart{height:440px;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+@media (max-width:600px){#chart{height:330px}}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--muted);margin:8px 2px 0}
+.legend i{display:inline-block;width:18px;height:0;border-top:2px dashed;vertical-align:middle;margin-right:5px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
+@media (max-width:820px){.grid2{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px;min-width:0}
+.card h3{font:600 15px var(--f-head);margin:0 0 10px;letter-spacing:.01em}
+.scen{font-size:16px;margin:0 0 10px;text-wrap:balance}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:14px}
+.kv dt{color:var(--muted)} .kv dd{margin:0}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+td.num,td .num,.lvl .num{white-space:nowrap}
+td,th{padding:7px 6px;border-top:1px solid var(--line);text-align:left;vertical-align:top}
+th{font-weight:500;color:var(--muted);font-size:12px;border-top:0}
+td.r,th.r{text-align:right}
+.tbl{overflow-x:auto}
+.ok{color:var(--up);font-weight:600} .ko{color:var(--down);font-weight:600}
+.role{font-size:11px;padding:1px 6px;border-radius:4px;background:var(--gold-soft);color:var(--gold);font-weight:600}
+.role.zone{background:var(--soft);color:var(--muted)}
+.inv{border-left:3px solid var(--down);padding-left:10px;margin-top:12px;font-size:14px}
+.note{font-size:12.5px;color:var(--muted);margin-top:14px}
+/* Methodik */
+.prose{max-width:72ch}
+.prose h3{font:600 19px/1.3 var(--f-head);margin:28px 0 8px}
+.prose p,.prose li{color:var(--ink)}
+.prose .rule{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 16px;margin:10px 0}
+.prose .rule b{color:var(--gold)}
+.fib{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
+@media (max-width:600px){.fib{grid-template-columns:1fr 1fr}}
+.fib div{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 12px}
+.fib .num{font-size:18px;color:var(--gold)}
+.fib small{display:block;color:var(--muted);font-size:12px}
+svg.diag{width:100%;max-width:560px;height:auto;display:block;margin:14px 0}
+.empty{padding:40px 18px;text-align:center;color:var(--muted)}
+footer{margin-top:36px;font-size:12px;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Elliott-Wellen-Monitor <span class="phi">φ</span></h1>
+      <div class="stamp" id="stamp">Lade Daten …</div>
+    </div>
+    <nav><a href="#" id="nav-ov" class="on">Übersicht</a><a href="#methodik" id="nav-me">Methodik</a></nav>
+  </header>
+  <main id="app"><div class="empty">Lade Daten …</div></main>
+  <footer>Automatische, regelbasierte Wellenzählung auf Tageskerzen. Keine Anlageberatung – Elliott-Zählungen sind Wahrscheinlichkeitsszenarien und werden laufend revidiert.</footer>
+</div>
+<script>
+const $ = (s, el = document) => el.querySelector(s);
+const app = $("#app");
+let SUMMARY = null;
+const cache = {};
+
+const fmtN = (x, d) => x == null ? "–" : x.toLocaleString("de-DE", { minimumFractionDigits: d, maximumFractionDigits: d });
+function dec(x) { const a = Math.abs(x); return a >= 1000 ? 0 : a >= 100 ? 1 : a >= 1 ? 2 : a >= 0.01 ? 4 : 6; }
+const fmtP = x => x == null ? "–" : fmtN(x, dec(x));
+const fmtPct = (x, d = 1) => x == null ? "–" : (x > 0 ? "+" : "") + fmtN(x * 100, d) + " %";
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+async function getJSON(u) {
+  const r = await fetch(u + "?v=" + (SUMMARY?.generated || Date.now()), { cache: "no-store" });
+  if (!r.ok) throw new Error(u + ": " + r.status);
+  return r.json();
+}
+
+function spark(vals, w = 120, h = 32) {
+  if (!vals || vals.length < 2) return "";
+  const mn = Math.min(...vals), mx = Math.max(...vals), rg = mx - mn || 1;
+  const pts = vals.map((v, i) => [i / (vals.length - 1) * (w - 4) + 2, h - 3 - (v - mn) / rg * (h - 6)]);
+  const d = pts.map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1)).join("");
+  const up = vals[vals.length - 1] >= vals[0];
+  const col = up ? "var(--up)" : "var(--down)";
+  const last = pts[pts.length - 1];
+  return `<svg class="spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true">
+    <path d="${d} L${last[0]} ${h} L2 ${h}Z" fill="${col}" opacity=".1"/>
+    <path d="${d}" fill="none" stroke="${col}" stroke-width="1.5"/>
+    <circle cx="${last[0]}" cy="${last[1]}" r="2.5" fill="${col}"/></svg>`;
+}
+
+function waveChip(p) {
+  if (!p) return "";
+  const bull = p.bias === "steigend";
+  return `<span class="chip ${bull ? "bull" : "bear"}">${bull ? "▲" : "▼"} ${esc(p.current)}</span>`;
+}
+
+function stampText(gen) {
+  const d = new Date(gen);
+  const ageH = (Date.now() - d) / 36e5;
+  const el = $("#stamp");
+  el.textContent = "Stand: " + d.toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Berlin" }) + " Uhr · Aktualisierung täglich 6:00 Uhr";
+  el.classList.toggle("old", ageH > 30);
+  if (ageH > 30) el.textContent += " · Daten älter als 24 h";
+}
+
+// ------------------------------------------------------------ Übersicht
+function renderOverview() {
+  $("#nav-ov").classList.add("on"); $("#nav-me").classList.remove("on");
+  document.title = "Elliott-Wellen-Monitor";
+  if (!SUMMARY) return;
+  const groups = {};
+  SUMMARY.assets.forEach(a => (groups[a.group] ||= []).push(a));
+  let html = "";
+  for (const [g, list] of Object.entries(groups)) {
+    html += `<h2>${esc(g)}</h2><div class="list">
+      <div class="row head"><span>Wert</span><span class="px">Kurs</span><span>Hauptszenario</span><span>Nächstes Ziel</span><span>Invalidierung</span><span class="px">Passung</span></div>`;
+    for (const a of list) {
+      if (a.error && !a.primary) {
+        html += `<a class="row" href="#${a.id}"><div class="name"><b>${esc(a.name)}</b><span>${esc(a.error)}</span></div>
+          <div class="px num">${fmtP(a.price)}</div><div></div><div></div><div></div><div></div></a>`;
+        continue;
+      }
+      const p = a.primary, nt = p.next_target;
+      const ntd = nt ? (nt.price - a.price) / a.price : null;
+      html += `<a class="row" href="#${a.id}">
+        <div class="name"><b>${esc(a.name)}${a.stale ? '<span class="stale">veraltet</span>' : ""}</b><span>${esc(a.yahoo || a.kucoin)} · ${esc(a.unit)}</span></div>
+        <div class="px"><div class="num">${fmtP(a.price)}</div><div class="chg num ${a.change_1d >= 0 ? "up" : "down"}">${fmtPct(a.change_1d, 2)}</div></div>
+        <div class="wave">${waveChip(p)}<small>${esc(p.pattern)} · ${esc(p.degree)}</small></div>
+        <div class="lvl"><span class="k">${nt ? esc(nt.label) : "Nächstes Ziel"}</span><span class="num">${nt ? fmtP(nt.price) : "alle Ziele erreicht"}</span> <span class="num ${ntd > 0 ? "up" : "down"}">${ntd == null ? "" : fmtPct(ntd)}</span></div>
+        <div class="lvl"><span class="k">${esc(p.invalidation.text.split(" (")[0])}</span><span class="num">${fmtP(p.invalidation.price)}</span> <span class="num down">${fmtPct(p.invalidation_dist)}</span></div>
+        <div class="fitcell"><span class="num">${p.score} %</span><span class="bar"><i style="width:${Math.min(100, p.score)}%"></i></span></div>
+      </a>`;
+    }
+    html += `</div>`;
+  }
+  app.innerHTML = html;
+}
+
+// ------------------------------------------------------------ Detail
+let chart = null, chartRO = null;
+async function renderDetail(id) {
+  $("#nav-ov").classList.remove("on"); $("#nav-me").classList.remove("on");
+  app.innerHTML = `<div class="empty">Lade ${esc(id)} …</div>`;
+  let d;
+  try { d = cache[id] ||= await getJSON(`data/${id}.json`); }
+  catch (e) { app.innerHTML = `<a class="back" href="#">← Übersicht</a><div class="empty">Daten für „${esc(id)}“ nicht gefunden.</div>`; return; }
+  document.title = d.name + " · Elliott-Wellen-Monitor";
+  const A = d.analysis;
+  const last = d.candles[d.candles.length - 1];
+  const prev = d.candles[d.candles.length - 2];
+  const chg = prev ? last[4] / prev[4] - 1 : 0;
+  app.innerHTML = `
+    <a class="back" href="#">← Übersicht</a>
+    <div class="dhead"><h1>${esc(d.name)}</h1><span class="big">${fmtP(last[4])} <small style="font-size:14px">${esc(d.unit)}</small></span>
+      <span class="num ${chg >= 0 ? "up" : "down"}">${fmtPct(chg, 2)}</span>
+      <span class="stamp">Schluss ${esc(last[0])} · ${esc(d.source)}${d.stale ? ' · <b class="down">veraltet</b>' : ""}</span></div>
+    ${A.error ? `<div class="card">${esc(A.error)}</div>` : `
+    <div class="toggle" role="tablist"><button id="b-p" class="on">Hauptszenario</button><button id="b-a" ${A.alternative ? "" : "disabled"}>Alternative</button></div>`}
+    <div id="chart"></div>
+    <div class="legend"><span><i style="border-color:var(--gold)"></i>Fibonacci-Ziel</span><span><i style="border-color:var(--muted)"></i>Zielzone</span><span><i style="border-color:var(--down)"></i>Invalidierung</span></div>
+    <div id="scen"></div>`;
+  drawChart(d, A.error ? null : A.primary);
+  if (A.error) return;
+  const show = which => {
+    const s = which === "a" ? A.alternative : A.primary;
+    $("#b-p").classList.toggle("on", which !== "a"); $("#b-a").classList.toggle("on", which === "a");
+    drawChart(d, s); renderScenario(d, A, s, which === "a");
+  };
+  $("#b-p").onclick = () => show("p");
+  $("#b-a").onclick = () => A.alternative && show("a");
+  show("p");
+}
+
+function renderScenario(d, A, s, isAlt) {
+  const price = A.price;
+  const tg = s.targets.map(t => {
+    const dist = (t.price - price) / price;
+    return `<tr><td>${esc(t.label)}</td><td><span class="role ${t.role === "Zone" ? "zone" : ""}">${esc(t.role)}</span></td>
+      <td class="r num">${fmtP(t.price)}</td><td class="r num ${dist >= 0 ? "up" : "down"}">${fmtPct(dist)}</td></tr>`;
+  }).join("");
+  const rules = s.rules.map(r => `<tr><td class="${r.ok ? "ok" : "ko"}">${r.ok ? "✓" : "✗"}</td><td>${esc(r.name)}<br><small style="color:var(--muted)">${esc(r.detail)}</small></td></tr>`).join("");
+  const guides = s.guides.map(g => `<tr><td>${esc(g.name)}</td><td class="num">${esc(g.actual)}</td><td style="color:var(--muted)">${esc(g.ideal)}</td>
+      <td class="r">${g.score == null ? '<small style="color:var(--muted)">läuft</small>' : `<span class="num">${g.score}</span>`}</td></tr>`).join("");
+  const trend = A.sma200 ? (price > A.sma200 ? "über" : "unter") : null;
+  $("#scen").innerHTML = `
+  <div class="grid2">
+    <div class="card">
+      <h3>${isAlt ? "Alternative Zählung" : "Hauptszenario"}</h3>
+      <p class="scen"><b>${esc(s.pattern)}</b>: ${esc(s.expect)}.</p>
+      <dl class="kv">
+        <dt>Wellengrad</dt><dd>${esc(s.degree)}</dd>
+        <dt>Kurzfristige Richtung</dt><dd class="${s.bias === "steigend" ? "up" : "down"}">${s.bias === "steigend" ? "▲ steigend" : "▼ fallend"}</dd>
+        <dt>Passung</dt><dd><span class="num">${s.score} %</span></dd>
+        <dt>RSI (14)</dt><dd class="num">${fmtN(A.rsi, 1)}</dd>
+        ${trend ? `<dt>200-Tage-Linie</dt><dd>Kurs ${trend} SMA 200 (<span class="num">${fmtP(A.sma200)}</span>)</dd>` : ""}
+      </dl>
+      <div class="inv"><b>Invalidierung bei <span class="num">${fmtP(s.invalidation.price)}</span></b> (${fmtPct(s.invalidation_dist)})<br>
+        <small style="color:var(--muted)">${esc(s.invalidation.text)} – wird das Niveau gebrochen, ist diese Zählung falsch.</small></div>
+      ${!isAlt && A.alternative ? `<p class="note">Alternative: ${esc(A.alternative.pattern)}, ${esc(A.alternative.current)} (Passung ${A.alternative.score} %).</p>` : ""}
+    </div>
+    <div class="card"><h3>Ziele &amp; Zonen</h3><div class="tbl"><table>
+      <tr><th>Niveau</th><th>Art</th><th class="r">Kurs</th><th class="r">Abstand</th></tr>${tg}</table></div></div>
+    <div class="card"><h3>Regelprüfung</h3><table>${rules}</table>
+      <p class="note">Die harten Elliott-Regeln. Ein Bruch würde die Zählung verwerfen; angezeigt werden nur regelkonforme Zählungen.</p></div>
+    <div class="card"><h3>Fibonacci-Richtlinien</h3><div class="tbl"><table>
+      <tr><th>Verhältnis</th><th>Ist</th><th>Ideal</th><th class="r">Punkte</th></tr>${guides}</table></div>
+      <p class="note">Punkte = Nähe zum Idealwert (100 = exakt). Die laufende Welle wird erst bewertet, wenn sie abgeschlossen ist.</p></div>
+  </div>`;
+}
+
+function drawChart(d, s) {
+  const el = $("#chart");
+  if (chart) { chart.remove(); chart = null; }
+  if (chartRO) { chartRO.disconnect(); chartRO = null; }
+  const ink = css("--ink"), muted = css("--muted"), line = css("--line"), up = css("--up"), down = css("--down"), gold = css("--gold");
+  chart = LightweightCharts.createChart(el, {
+    autoSize: true,
+    layout: { background: { type: "solid", color: css("--panel") }, textColor: muted, fontFamily: css("--f-body") },
+    grid: { vertLines: { color: line }, horzLines: { color: line } },
+    rightPriceScale: { borderColor: line }, timeScale: { borderColor: line },
+    localization: { locale: "de-DE", priceFormatter: p => fmtP(p) },
+    crosshair: { mode: 0 },
+  });
+  const cs = chart.addCandlestickSeries({ upColor: up, downColor: down, borderVisible: false, wickUpColor: up, wickDownColor: down });
+  const candles = d.candles.slice(-320).map(c => ({ time: c[0], open: c[1], high: c[2], low: c[3], close: c[4] }));
+  cs.setData(candles);
+  if (s) {
+    const first = candles[0].time;
+    const pts = s.points.filter(p => p.date >= first);
+    const ls = chart.addLineSeries({ color: gold, lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+    ls.setData(pts.map(p => ({ time: p.date, value: p.price })));
+    const pv = s.points;
+    ls.setMarkers(pts.map(p => {
+      const i = pv.indexOf(p);
+      const isHigh = i > 0 ? p.price > pv[i - 1].price : p.price > pv[1].price;
+      return { time: p.date, position: isHigh ? "aboveBar" : "belowBar", color: gold, shape: "circle", text: p.label === "0" ? "Start" : p.label, size: 0.6 };
+    }));
+    const wide = el.clientWidth > 640;
+    s.targets.forEach(t => cs.createPriceLine({ price: t.price, color: t.role === "Zone" ? muted : gold, lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: wide ? t.label : "" }));
+    cs.createPriceLine({ price: s.invalidation.price, color: down, lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: wide ? "Invalidierung" : "" });
+  }
+  let from = candles.length - 220;
+  if (s && s.points.length) { const fi = candles.findIndex(c => c.time >= s.points[0].date); if (fi >= 0) from = Math.min(from, fi - 12); }
+  chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, from), to: candles.length + 8 });
+}
+
+// ------------------------------------------------------------ Methodik
+function renderMethod() {
+  $("#nav-me").classList.add("on"); $("#nav-ov").classList.remove("on");
+  document.title = "Methodik · Elliott-Wellen-Monitor";
+  app.innerHTML = $("#tpl-method").innerHTML;
+}
+
+function route() {
+  const h = location.hash.slice(1);
+  if (!h) renderOverview();
+  else if (h === "methodik") renderMethod();
+  else renderDetail(h);
+  window.scrollTo(0, 0);
+}
+
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { const h = location.hash.slice(1); if (h && h !== "methodik") renderDetail(h); });
+window.addEventListener("hashchange", route);
+(async () => {
+  try {
+    SUMMARY = await getJSON("data/summary.json");
+    stampText(SUMMARY.generated);
+  } catch (e) {
+    $("#stamp").textContent = "Noch keine Daten – der erste Lauf der Aktualisierung steht aus.";
+    app.innerHTML = `<div class="empty">Noch keine Kursdaten vorhanden. Sie erscheinen nach dem ersten Lauf der täglichen Aktualisierung.</div>`;
+    if (location.hash.slice(1) === "methodik") renderMethod();
+    return;
+  }
+  route();
+})();
+</script>
+
+<template id="tpl-method">
+<div class="prose">
+  <h3>Die Idee</h3>
+  <p>Ralph Nelson Elliott beobachtete in den 1930er-Jahren, dass sich Kursbewegungen in wiederkehrenden Mustern entfalten, weil sie die Massenpsychologie der Marktteilnehmer abbilden: Optimismus und Pessimismus wechseln sich in Wellen ab. In Trendrichtung läuft ein <b>Impuls aus fünf Wellen</b> (1–5), gegen den Trend eine <b>Korrektur aus drei Wellen</b> (A–B–C). Zusammen bilden sie einen 5-3-Zyklus, der selbst wieder Teil eines größeren Zyklus ist (fraktale Struktur, „Wellengrade“).</p>
+  <svg class="diag" viewBox="0 0 560 220" role="img" aria-label="Schema: Impuls 1 bis 5 aufwärts, danach Korrektur A B C">
+    <polyline fill="none" stroke="var(--gold)" stroke-width="2.5" points="20,190 90,110 125,150 230,40 270,85 330,20 380,90 420,60 480,140"/>
+    <g font-family="IBM Plex Mono, monospace" font-size="15" fill="var(--ink)" text-anchor="middle">
+      <text x="90" y="100">1</text><text x="125" y="170">2</text><text x="230" y="30">3</text><text x="270" y="105">4</text><text x="330" y="12">5</text>
+      <text x="380" y="110">A</text><text x="420" y="50">B</text><text x="480" y="160">C</text></g>
+    <line x1="20" y1="205" x2="330" y2="205" stroke="var(--muted)"/><text x="175" y="218" font-size="12" fill="var(--muted)" text-anchor="middle">Impuls (Trend)</text>
+    <line x1="335" y1="205" x2="480" y2="205" stroke="var(--muted)"/><text x="408" y="218" font-size="12" fill="var(--muted)" text-anchor="middle">Korrektur</text>
+  </svg>
+  <h3>Die drei unverletzlichen Regeln</h3>
+  <div class="rule"><b>Regel 1:</b> Welle 2 korrigiert nie mehr als 100 % von Welle 1. Fällt der Kurs unter den Start von Welle 1, war es kein Impuls.</div>
+  <div class="rule"><b>Regel 2:</b> Welle 3 ist nie die kürzeste der Wellen 1, 3 und 5 – meist ist sie die längste und stärkste.</div>
+  <div class="rule"><b>Regel 3:</b> Welle 4 dringt nicht in den Kursbereich von Welle 1 ein (keine Überlappung). Ausnahme sind Diagonalen, die hier nicht gezählt werden.</div>
+  <h3>Richtlinien und Fibonacci-Verhältnisse</h3>
+  <p>Die Längen der Wellen stehen oft in Fibonacci-Verhältnissen zueinander (Goldener Schnitt φ ≈ 1,618). Das sind Richtlinien, keine Regeln – sie machen eine Zählung wahrscheinlicher, nicht sicher.</p>
+  <div class="fib">
+    <div><span class="num">50–61,8 %</span><small>Rücklauf Welle 2</small></div>
+    <div><span class="num">1,618 ×</span><small>Welle 3 zu Welle 1</small></div>
+    <div><span class="num">23,6–38,2 %</span><small>Rücklauf Welle 4</small></div>
+    <div><span class="num">1,0 / 0,618 ×</span><small>Welle 5 zu Welle 1</small></div>
+    <div><span class="num">50–78,6 %</span><small>Welle B zu A</small></div>
+    <div><span class="num">1,0 ×</span><small>Welle C zu A</small></div>
+  </div>
+  <p><b>Wechselregel:</b> Ist Welle 2 tief und scharf, fällt Welle 4 meist flach und seitwärts aus – und umgekehrt. <b>Divergenz:</b> In Welle 5 erreicht der Kurs oft ein neues Extrem, der RSI aber nicht mehr – ein Hinweis auf das nahende Impulsende.</p>
+  <h3>Wie dieses Dashboard zählt</h3>
+  <ol>
+    <li><b>Wendepunkte:</b> Ein ZigZag-Filter markiert Hochs und Tiefs, sobald sich der Kurs um ein Vielfaches der durchschnittlichen Tagesschwankung (ATR 14) dreht. Vier Schwellen (2 bis 6,5 × ATR) ergeben vier Wellengrade von „Fein“ bis „Übergeordnet“.</li>
+    <li><b>Kandidaten:</b> Für jede Folge von Wendepunkten, die am aktuellen Kurs endet, werden Impuls- (1–5, ggf. mit A–B–C) und Korrektur-Interpretationen gebildet.</li>
+    <li><b>Filter:</b> Zählungen, die eine der drei Regeln brechen, werden verworfen.</li>
+    <li><b>Bewertung:</b> Jede Fibonacci-Richtlinie bekommt Punkte nach Nähe zum Idealwert. Dazu kommen die Vollständigkeit der Struktur und wie bedeutend der Startpunkt ist. Ergebnis ist die <b>Passung</b> in Prozent.</li>
+    <li><b>Szenarien:</b> Die beste Zählung ist das Hauptszenario, die beste mit anderer Aussage die Alternative. Daraus folgen Zielzonen und das Invalidierungsniveau.</li>
+  </ol>
+  <h3>Grenzen</h3>
+  <p>Elliott-Zählungen sind subjektiv; auch erfahrene Analysten zählen denselben Chart unterschiedlich. Eine Maschine erkennt keine Diagonalen, Dreiecke oder komplexen Korrekturen (W-X-Y) zuverlässig und kennt keine Nachrichtenlage. Nutze die Zählung als Struktur für deine eigene Einschätzung. Entscheidend ist das <b>Invalidierungsniveau</b>: Es sagt dir, wann ein Szenario nicht mehr gilt.</p>
+  <h3>Datenquellen</h3>
+  <p>Aktien und Indizes: Yahoo Finance (Tageskerzen der Heimatbörse). Krypto: KuCoin (Tageskerzen in USDT, UTC-Tagesschluss), Ersatz Yahoo Finance. Aktualisierung täglich um 6:00 Uhr deutscher Zeit; unvollständige Tageskerzen werden verworfen.</p>
+  <p class="note">Keine Anlageberatung. Alle Angaben ohne Gewähr.</p>
+</div>
+</template>
+</body>
+</html>

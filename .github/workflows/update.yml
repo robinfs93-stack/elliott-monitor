@@ -1,0 +1,58 @@
+name: Kurse aktualisieren
+
+on:
+  schedule:
+    # GitHub rechnet in UTC. 04:00 UTC = 06:00 Sommerzeit, 05:00 UTC = 06:00 Winterzeit.
+    # Der Schritt "Uhrzeit prüfen" lässt nur den Lauf durch, der in Berlin auf 6 Uhr fällt.
+    - cron: "0 4 * * *"
+    - cron: "0 5 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-data
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Uhrzeit prüfen
+        id: gate
+        run: |
+          # Winterzeit (CET) -> 05:00 UTC, Sommerzeit (CEST) -> 04:00 UTC. Verzögerte Starts bleiben gültig.
+          if [ "$(TZ=Europe/Berlin date +%Z)" = "CET" ]; then WANT="0 5 * * *"; else WANT="0 4 * * *"; fi
+          echo "Auslöser: ${{ github.event_name }} '${{ github.event.schedule }}', erwartet '$WANT'"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "${{ github.event.schedule }}" = "$WANT" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.gate.outputs.run == 'true'
+
+      - uses: actions/setup-python@v5
+        if: steps.gate.outputs.run == 'true'
+        with:
+          python-version: "3.12"
+
+      - name: Daten holen und Wellen zählen
+        if: steps.gate.outputs.run == 'true'
+        run: python scripts/build.py
+
+      - name: Ergebnis speichern
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          git config user.name "kurs-update"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/
+          if git diff --cached --quiet; then
+            echo "Keine Änderungen."
+          else
+            git commit -m "Kursdaten $(TZ=Europe/Berlin date +'%Y-%m-%d %H:%M')"
+            git push
+          fi
