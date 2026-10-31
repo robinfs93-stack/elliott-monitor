@@ -35,14 +35,15 @@ def get_json(url, tries=3):
 
 def yahoo(symbol):
     sym = urllib.parse.quote(symbol)
+    d, errs = None, []
     for host in ("query1", "query2"):
         try:
-            d = get_json(f"https://{host}.finance.yahoo.com/v8/finance/chart/{sym}?range=2y&interval=1d")
+            d = get_json(f"https://{host}.finance.yahoo.com/v8/finance/chart/{sym}?range=2y&interval=1d", tries=2)
             break
-        except Exception:  # noqa: BLE001
-            d = None
+        except Exception as e:  # noqa: BLE001
+            errs.append(str(e)[-120:])
     if not d:
-        raise RuntimeError(f"Yahoo {symbol}: keine Antwort")
+        raise RuntimeError(f"Yahoo {symbol}: {' | '.join(errs)}")
     r = d["chart"]["result"][0]
     q = r["indicators"]["quote"][0]
     out = []
@@ -54,6 +55,35 @@ def yahoo(symbol):
         off = r["meta"].get("gmtoffset", 0)
         day = datetime.fromtimestamp(ts + off, timezone.utc).strftime("%Y-%m-%d")
         out.append([day] + [float(x) for x in vals] + [float(q["volume"][i] or 0)])
+    return dedupe(out)
+
+
+def yf_lib(symbol):
+    """yfinance (mit Browser-Impersonation, kommt meist auch durch, wenn Yahoo Cloud-IPs drosselt)."""
+    import yfinance as yf
+    df = yf.Ticker(symbol).history(period="2y", interval="1d", auto_adjust=False, actions=False)
+    if df is None or df.empty:
+        raise RuntimeError(f"yfinance {symbol}: leer")
+    out = []
+    for idx, r in df.iterrows():
+        vals = [r["Open"], r["High"], r["Low"], r["Close"]]
+        if any(v != v for v in vals):  # NaN
+            continue
+        out.append([idx.strftime("%Y-%m-%d")] + [float(v) for v in vals] + [float(r.get("Volume", 0) or 0)])
+    return dedupe(out)
+
+
+def stooq(symbol):
+    import csv, io
+    req = urllib.request.Request(f"https://stooq.com/q/d/l/?s={symbol}&i=d", headers={"User-Agent": UA})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        txt = r.read().decode()
+    rows = list(csv.DictReader(io.StringIO(txt)))
+    if not rows or "Close" not in rows[0]:
+        raise RuntimeError(f"Stooq {symbol}: {txt[:80]!r}")
+    cutoff = datetime.now(timezone.utc).replace(year=datetime.now(timezone.utc).year - 2).strftime("%Y-%m-%d")
+    out = [[x["Date"], float(x["Open"]), float(x["High"]), float(x["Low"]), float(x["Close"]), float(x.get("Volume") or 0)]
+           for x in rows if x["Date"] >= cutoff]
     return dedupe(out)
 
 
@@ -103,8 +133,14 @@ def main():
     for a in assets:
         crypto = "kucoin" in a
         rows, source, err = None, None, None
-        attempts = ([("KuCoin", kucoin, a["kucoin"])] if crypto else []) + \
-                   ([("Yahoo Finance", yahoo, a["yahoo"])] if a.get("yahoo") else [])
+        attempts = []
+        if crypto:
+            attempts.append(("KuCoin", kucoin, a["kucoin"]))
+        if a.get("yahoo"):
+            attempts += [("Yahoo Finance", yf_lib, a["yahoo"]), ("Yahoo Finance", yahoo, a["yahoo"])]
+        if a.get("stooq"):
+            attempts.append(("Stooq", stooq, a["stooq"]))
+        errs = []
         for name, fn, sym in attempts:
             try:
                 rows = drop_incomplete(fn(sym), crypto)
@@ -113,7 +149,8 @@ def main():
                 source = f"{name} ({sym})"
                 break
             except Exception as e:  # noqa: BLE001
-                err = str(e)
+                errs.append(f"{name}: {str(e)[:200]}")
+                err = " || ".join(errs)
                 rows = None
         stale = False
         if rows is None:

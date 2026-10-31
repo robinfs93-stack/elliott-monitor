@@ -40,6 +40,10 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Pakete installieren
+        if: steps.gate.outputs.run == 'true'
+        run: pip install --quiet yfinance
+
       - name: Daten holen und Wellen zählen
         if: steps.gate.outputs.run == 'true'
         run: python scripts/build.py

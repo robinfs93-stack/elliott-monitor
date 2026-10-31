@@ -1,14 +1,14 @@
 [
-  {"id": "dax",   "name": "DAX",          "group": "Indizes", "yahoo": "^GDAXI",  "unit": "Pkt"},
-  {"id": "spx",   "name": "S&P 500",      "group": "Indizes", "yahoo": "^GSPC",   "unit": "Pkt"},
-  {"id": "nvda",  "name": "NVIDIA",       "group": "Aktien",  "yahoo": "NVDA",    "unit": "USD"},
-  {"id": "aapl",  "name": "Apple",        "group": "Aktien",  "yahoo": "AAPL",    "unit": "USD"},
-  {"id": "googl", "name": "Alphabet",     "group": "Aktien",  "yahoo": "GOOGL",   "unit": "USD"},
-  {"id": "meta",  "name": "Meta",         "group": "Aktien",  "yahoo": "META",    "unit": "USD"},
-  {"id": "sap",   "name": "SAP",          "group": "Aktien",  "yahoo": "SAP.DE",  "unit": "EUR"},
-  {"id": "rhm",   "name": "Rheinmetall",  "group": "Aktien",  "yahoo": "RHM.DE",  "unit": "EUR"},
-  {"id": "btc",   "name": "Bitcoin",      "group": "Krypto",  "kucoin": "BTC-USDT", "yahoo": "BTC-USD", "unit": "USD"},
-  {"id": "eth",   "name": "Ethereum",     "group": "Krypto",  "kucoin": "ETH-USDT", "yahoo": "ETH-USD", "unit": "USD"},
-  {"id": "sol",   "name": "Solana",       "group": "Krypto",  "kucoin": "SOL-USDT", "yahoo": "SOL-USD", "unit": "USD"},
-  {"id": "kas",   "name": "Kaspa",        "group": "Krypto",  "kucoin": "KAS-USDT", "yahoo": "KAS-USD", "unit": "USD"}
+  {"id": "dax", "name": "DAX", "group": "Indizes", "yahoo": "^GDAXI", "unit": "Pkt", "stooq": "^dax"},
+  {"id": "spx", "name": "S&P 500", "group": "Indizes", "yahoo": "^GSPC", "unit": "Pkt", "stooq": "^spx"},
+  {"id": "nvda", "name": "NVIDIA", "group": "Aktien", "yahoo": "NVDA", "unit": "USD", "stooq": "nvda.us"},
+  {"id": "aapl", "name": "Apple", "group": "Aktien", "yahoo": "AAPL", "unit": "USD", "stooq": "aapl.us"},
+  {"id": "googl", "name": "Alphabet", "group": "Aktien", "yahoo": "GOOGL", "unit": "USD", "stooq": "googl.us"},
+  {"id": "meta", "name": "Meta", "group": "Aktien", "yahoo": "META", "unit": "USD", "stooq": "meta.us"},
+  {"id": "sap", "name": "SAP", "group": "Aktien", "yahoo": "SAP.DE", "unit": "EUR", "stooq": "sap.de"},
+  {"id": "rhm", "name": "Rheinmetall", "group": "Aktien", "yahoo": "RHM.DE", "unit": "EUR", "stooq": "rhm.de"},
+  {"id": "btc", "name": "Bitcoin", "group": "Krypto", "kucoin": "BTC-USDT", "yahoo": "BTC-USD", "unit": "USD"},
+  {"id": "eth", "name": "Ethereum", "group": "Krypto", "kucoin": "ETH-USDT", "yahoo": "ETH-USD", "unit": "USD"},
+  {"id": "sol", "name": "Solana", "group": "Krypto", "kucoin": "SOL-USDT", "yahoo": "SOL-USD", "unit": "USD"},
+  {"id": "kas", "name": "Kaspa", "group": "Krypto", "kucoin": "KAS-USDT", "yahoo": "KAS-USD", "unit": "USD"}
 ]
