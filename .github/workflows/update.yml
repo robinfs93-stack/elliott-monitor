@@ -10,6 +10,8 @@ on:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 concurrency:
   group: update-data
@@ -18,6 +20,8 @@ concurrency:
 jobs:
   update:
     runs-on: ubuntu-latest
+    outputs:
+      ran: ${{ steps.gate.outputs.run }}
     timeout-minutes: 15
     steps:
       - name: Uhrzeit prüfen
@@ -60,3 +64,8 @@ jobs:
             git commit -m "Kursdaten $(TZ=Europe/Berlin date +'%Y-%m-%d %H:%M')"
             git push
           fi
+
+  deploy:
+    needs: update
+    if: needs.update.outputs.ran == 'true'
+    uses: ./.github/workflows/pages.yml
