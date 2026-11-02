@@ -201,7 +201,7 @@ function renderOverview() {
         <div class="name"><b>${esc(a.name)}${a.stale ? '<span class="stale">veraltet</span>' : ""}</b><span>${esc(a.yahoo || a.kucoin)} · ${esc(a.unit)}</span></div>
         <div class="px"><div class="num">${fmtP(a.price)}</div><div class="chg num ${a.change_1d >= 0 ? "up" : "down"}">${fmtPct(a.change_1d, 2)}</div></div>
         <div class="wave">${waveChip(p)}<small>${esc(p.pattern)} · ${esc(p.degree)}</small></div>
-        <div class="lvl"><span class="k">${nt ? esc(nt.label) : "Nächstes Ziel"}</span><span class="num">${nt ? fmtP(nt.price) : "alle Ziele erreicht"}</span> <span class="num ${ntd > 0 ? "up" : "down"}">${ntd == null ? "" : fmtPct(ntd)}</span></div>
+        <div class="lvl"><span class="k">${nt ? esc(nt.label) : "Nächstes Ziel"}</span><span class="num">${nt ? fmtP(nt.price) : "Zielzone erreicht"}</span> <span class="num ${ntd > 0 ? "up" : "down"}">${ntd == null ? "" : fmtPct(ntd)}</span></div>
         <div class="lvl"><span class="k">${esc(p.invalidation.text.split(" (")[0])}</span><span class="num">${fmtP(p.invalidation.price)}</span> <span class="num down">${fmtPct(p.invalidation_dist)}</span></div>
         <div class="fitcell"><span class="num">${p.score} %</span><span class="bar"><i style="width:${Math.min(100, p.score)}%"></i></span></div>
         ${p.expect ? `<div class="fc"><b>Prognose:</b> ${esc(p.expect)}${nt ? `, nächstes Ziel ${fmtP(nt.price)}` : ""}.</div>` : ""}
