@@ -182,7 +182,7 @@ def main():
                 "price": res["price"], "date": res["date"], "change_1d": res["change_1d"], "rsi": res["rsi"],
                 "sma200": res["sma200"],
                 "spark": [r[4] for r in rows[-90:]],
-                "primary": {k: p[k] for k in ("pattern", "current", "phase", "bias", "score", "degree",
+                "primary": {k: p[k] for k in ("pattern", "current", "phase", "expect", "bias", "score", "degree",
                                               "invalidation", "invalidation_dist", "next_target")},
                 "alternative": ({k: res["alternative"][k] for k in ("pattern", "current", "bias", "score")}
                                 if res["alternative"] else None),

@@ -60,6 +60,8 @@ h2{font:600 13px/1 var(--f-head);text-transform:uppercase;letter-spacing:.08em;c
 .bar{width:56px;height:5px;border-radius:3px;background:var(--soft);overflow:hidden}
 .bar i{display:block;height:100%;background:var(--gold)}
 .spark{display:block}
+.fc{grid-column:1/-1;font-size:13px;color:var(--muted);margin-top:-4px}
+.fc b{color:var(--ink);font-weight:600}
 .stale{display:inline-block;margin-left:6px;font-size:11px;color:var(--down);font-weight:600}
 @media (max-width:820px){
   .row.head{display:none}
@@ -202,6 +204,7 @@ function renderOverview() {
         <div class="lvl"><span class="k">${nt ? esc(nt.label) : "Nächstes Ziel"}</span><span class="num">${nt ? fmtP(nt.price) : "alle Ziele erreicht"}</span> <span class="num ${ntd > 0 ? "up" : "down"}">${ntd == null ? "" : fmtPct(ntd)}</span></div>
         <div class="lvl"><span class="k">${esc(p.invalidation.text.split(" (")[0])}</span><span class="num">${fmtP(p.invalidation.price)}</span> <span class="num down">${fmtPct(p.invalidation_dist)}</span></div>
         <div class="fitcell"><span class="num">${p.score} %</span><span class="bar"><i style="width:${Math.min(100, p.score)}%"></i></span></div>
+        ${p.expect ? `<div class="fc"><b>Prognose:</b> ${esc(p.expect)}${nt ? `, nächstes Ziel ${fmtP(nt.price)}` : ""}.</div>` : ""}
       </a>`;
     }
     html += `</div>`;
@@ -258,7 +261,7 @@ function renderScenario(d, A, s, isAlt) {
   $("#scen").innerHTML = `
   <div class="grid2">
     <div class="card">
-      <h3>${isAlt ? "Alternative Zählung" : "Hauptszenario"}</h3>
+      <h3>${isAlt ? "Prognose – alternative Zählung" : "Prognose – Hauptszenario"}</h3>
       <p class="scen"><b>${esc(s.pattern)}</b>: ${esc(s.expect)}.</p>
       <dl class="kv">
         <dt>Wellengrad</dt><dd>${esc(s.degree)}</dd>
